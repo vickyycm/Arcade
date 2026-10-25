@@ -45,12 +45,15 @@ const float FUERZA_SALTO = -5.0f;
 const float GRAVEDAD = 0.45f;
 
 const int CANTIDAD_PLATAFORMAS = 4;
-const int plataformasY[4] = {275, 215, 155, 95};
+const int PLATAFORMA_IZQ = 10;
+const int PLATAFORMA_DER = 229;
+const int GROSOR_PLATAFORMA = 7;
+const int INCLINACION = 12;
+const int HUECO = 16;
+
+const int plataformasBase[4] = {275, 215, 155, 95};
 
 const int escalerasX[3] = {190, 38, 190};
-const int escalerasY1[3] = {222, 162, 102};
-const int escalerasY2[3] = {275, 215, 155};
-
 const int VELOCIDAD_ESCALERA = 2;
 const int TOLERANCIA_ESCALERA = 12;
 
@@ -64,6 +67,7 @@ const unsigned long INTERVALO_APARICION = 1500;
 
 const int BUFFER_ANCHO = 32;
 const int BUFFER_ALTO = 32;
+
 uint16_t bufferRegion[BUFFER_ANCHO * BUFFER_ALTO];
 
 struct Barril {
@@ -105,8 +109,57 @@ unsigned long ultimoMovimientoEscalera = 0;
 unsigned long ultimoMovimientoBarriles = 0;
 unsigned long ultimaAparicionBarril = 0;
 
-int posicionMarioEnPlataforma(int nivel) {
-  return plataformasY[nivel] - MARIO_ALTO;
+int direccionPlataforma(int nivel) {
+  return nivel % 2 == 1 ? 1 : -1;
+}
+
+int inicioPlataforma(int nivel) {
+  return direccionPlataforma(nivel) < 0
+    ? PLATAFORMA_IZQ + HUECO
+    : PLATAFORMA_IZQ;
+}
+
+int finPlataforma(int nivel) {
+  return direccionPlataforma(nivel) > 0
+    ? PLATAFORMA_DER - HUECO
+    : PLATAFORMA_DER;
+}
+
+int alturaPlataforma(int nivel, int x) {
+  x = constrain(x, PLATAFORMA_IZQ, PLATAFORMA_DER);
+
+  long desplazamiento =
+    (long)(x - PLATAFORMA_IZQ) * INCLINACION /
+    (PLATAFORMA_DER - PLATAFORMA_IZQ);
+
+  if (direccionPlataforma(nivel) > 0) {
+    return plataformasBase[nivel] -
+           INCLINACION / 2 + desplazamiento;
+  }
+
+  return plataformasBase[nivel] +
+         INCLINACION / 2 - desplazamiento;
+}
+
+int posicionMarioEnPlataforma(int nivel, int x) {
+  return alturaPlataforma(nivel, x + MARIO_ANCHO / 2)
+         - MARIO_ALTO;
+}
+
+int posicionBarrilEnPlataforma(int nivel, int x) {
+  return alturaPlataforma(nivel, x) - RADIO_BARRIL;
+}
+
+int escaleraSuperior(int indice) {
+  return alturaPlataforma(
+    indice + 1, escalerasX[indice] + MARIO_ANCHO / 2
+  ) + GROSOR_PLATAFORMA;
+}
+
+int escaleraInferior(int indice) {
+  return alturaPlataforma(
+    indice, escalerasX[indice] + MARIO_ANCHO / 2
+  );
 }
 
 void actualizarSeleccionMenu() {
@@ -197,20 +250,11 @@ void actualizarMenu() {
   }
 }
 
-void dibujarEscalera(int x, int y1, int y2) {
-  tft.drawFastVLine(x, y1, y2 - y1, ILI9341_CYAN);
-  tft.drawFastVLine(x + 14, y1, y2 - y1, ILI9341_CYAN);
-
-  for (int y = y1; y <= y2; y += 8) {
-    tft.drawFastHLine(x, y, 15, ILI9341_CYAN);
-  }
-}
-
-uint16_t colorEscenario(int x, int y) {
+bool pixelEscalera(int x, int y) {
   for (int i = 0; i < 3; i++) {
     int ex = escalerasX[i];
-    int y1 = escalerasY1[i];
-    int y2 = escalerasY2[i];
+    int y1 = escaleraSuperior(i);
+    int y2 = escaleraInferior(i);
 
     if (x < ex || x > ex + 14 ||
         y < y1 || y > y2) {
@@ -223,8 +267,16 @@ uint16_t colorEscenario(int x, int y) {
     bool peldano = (y - y1) % 8 == 0;
 
     if (lateral || peldano) {
-      return ILI9341_CYAN;
+      return true;
     }
+  }
+
+  return false;
+}
+
+uint16_t colorEscenario(int x, int y) {
+  if (pixelEscalera(x, y)) {
+    return ILI9341_CYAN;
   }
 
   int dx = x - 197;
@@ -272,12 +324,17 @@ uint16_t colorEscenario(int x, int y) {
     }
   }
 
-  if (x >= 10 && x < 230) {
-    for (int i = 0; i < CANTIDAD_PLATAFORMAS; i++) {
-      if (y >= plataformasY[i] &&
-          y < plataformasY[i] + 7) {
-        return ILI9341_RED;
-      }
+  for (int i = 0; i < CANTIDAD_PLATAFORMAS; i++) {
+    if (x < inicioPlataforma(i) ||
+        x > finPlataforma(i)) {
+      continue;
+    }
+
+    int altura = alturaPlataforma(i, x);
+
+    if (y >= altura &&
+        y < altura + GROSOR_PLATAFORMA) {
+      return ILI9341_RED;
     }
   }
 
@@ -424,10 +481,7 @@ void moverSpriteMario(
   marioY = (float)yNuevo;
 
   renderizarRegion(
-    izquierda,
-    arriba,
-    derecha,
-    abajo
+    izquierda, arriba, derecha, abajo
   );
 }
 
@@ -463,7 +517,7 @@ bool espacioLibre(
     }
 
     if (abs(x - otro.x) < SEPARACION_BARRILES &&
-        abs(y - otro.y) <= RADIO_BARRIL * 2) {
+        abs(y - otro.y) <= 18) {
       return false;
     }
   }
@@ -473,7 +527,7 @@ bool espacioLibre(
 
 void crearBarril() {
   int xInicial = 55;
-  int yInicial = plataformasY[3] - RADIO_BARRIL;
+  int yInicial = posicionBarrilEnPlataforma(3, xInicial);
 
   if (!espacioLibre(
     xInicial, yInicial, 3, -1
@@ -489,7 +543,7 @@ void crearBarril() {
     barriles[i].x = xInicial;
     barriles[i].y = yInicial;
     barriles[i].nivel = 3;
-    barriles[i].direccion = 1;
+    barriles[i].direccion = direccionPlataforma(3);
     return;
   }
 }
@@ -501,7 +555,7 @@ void moverBarril(Barril &b, int indice) {
     if (b.nivel == 0) {
       b.y += VELOCIDAD_BARRIL;
 
-      if (b.y - RADIO_BARRIL > 282) {
+      if (b.y - RADIO_BARRIL > 292) {
         b.activo = false;
       }
 
@@ -510,7 +564,7 @@ void moverBarril(Barril &b, int indice) {
 
     int siguienteNivel = b.nivel - 1;
     int yDestino =
-      plataformasY[siguienteNivel] - RADIO_BARRIL;
+      posicionBarrilEnPlataforma(siguienteNivel, b.x);
 
     if (b.y + VELOCIDAD_BARRIL >= yDestino) {
       if (espacioLibre(
@@ -518,7 +572,7 @@ void moverBarril(Barril &b, int indice) {
       )) {
         b.y = yDestino;
         b.nivel = siguienteNivel;
-        b.direccion *= -1;
+        b.direccion = direccionPlataforma(siguienteNivel);
         b.cayendo = false;
       } else {
         b.y = yDestino - RADIO_BARRIL * 2;
@@ -534,18 +588,27 @@ void moverBarril(Barril &b, int indice) {
   int siguienteX =
     b.x + b.direccion * VELOCIDAD_BARRIL;
 
-  siguienteX = constrain(siguienteX, 16, 224);
-
   if (!espacioLibre(
-    siguienteX, b.y, b.nivel, indice
+    siguienteX,
+    posicionBarrilEnPlataforma(b.nivel, siguienteX),
+    b.nivel,
+    indice
   )) {
     return;
   }
 
   b.x = siguienteX;
+  b.y = posicionBarrilEnPlataforma(b.nivel, b.x);
 
-  if ((b.direccion > 0 && b.x >= 224) ||
-      (b.direccion < 0 && b.x <= 16)) {
+  bool bordeDerecho =
+    b.direccion > 0 &&
+    b.x >= finPlataforma(b.nivel);
+
+  bool bordeIzquierdo =
+    b.direccion < 0 &&
+    b.x <= inicioPlataforma(b.nivel);
+
+  if (bordeDerecho || bordeIzquierdo) {
     b.cayendo = true;
   }
 }
@@ -630,10 +693,7 @@ void actualizarBarriles() {
     }
 
     renderizarRegion(
-      izquierda,
-      arriba,
-      derecha,
-      abajo
+      izquierda, arriba, derecha, abajo
     );
   }
 }
@@ -711,7 +771,7 @@ void actualizarEscalada() {
 
   int yAnterior = (int)marioY;
   int yDestino =
-    posicionMarioEnPlataforma(plataformaDestino);
+    posicionMarioEnPlataforma(plataformaDestino, marioX);
 
   int yNuevo = yAnterior;
 
@@ -806,15 +866,22 @@ void actualizarMario() {
     if (!marioEnSuelo) {
       nuevaY += velocidadVertical;
       velocidadVertical += GRAVEDAD;
+    }
+  }
 
-      int suelo =
-        posicionMarioEnPlataforma(plataformaActual);
+  if (marioEnSuelo) {
+    nuevaY = posicionMarioEnPlataforma(
+      plataformaActual, nuevaX
+    );
+  } else {
+    int suelo = posicionMarioEnPlataforma(
+      plataformaActual, nuevaX
+    );
 
-      if (nuevaY >= suelo) {
-        nuevaY = suelo;
-        velocidadVertical = 0.0f;
-        marioEnSuelo = true;
-      }
+    if (velocidadVertical >= 0 && nuevaY >= suelo) {
+      nuevaY = suelo;
+      velocidadVertical = 0.0f;
+      marioEnSuelo = true;
     }
   }
 
@@ -822,10 +889,8 @@ void actualizarMario() {
 
   if (nuevaX != xAnterior || yNuevo != yAnterior) {
     moverSpriteMario(
-      xAnterior,
-      yAnterior,
-      nuevaX,
-      yNuevo
+      xAnterior, yAnterior,
+      nuevaX, yNuevo
     );
   }
 
@@ -838,7 +903,7 @@ void dibujarDonkeyKong() {
   marioX = 24;
   plataformaActual = 0;
   plataformaDestino = 0;
-  marioY = posicionMarioEnPlataforma(0);
+  marioY = posicionMarioEnPlataforma(0, marioX);
 
   velocidadVertical = 0.0f;
   marioEnSuelo = true;
@@ -865,22 +930,38 @@ void dibujarDonkeyKong() {
   tft.setCursor(175, 38);
   tft.print("VIDAS: 3");
 
-  for (int i = 0; i < CANTIDAD_PLATAFORMAS; i++) {
-    tft.fillRect(
-      10,
-      plataformasY[i],
-      220,
-      7,
-      ILI9341_RED
-    );
+  for (int nivel = 0; nivel < CANTIDAD_PLATAFORMAS; nivel++) {
+    for (int x = inicioPlataforma(nivel);
+         x <= finPlataforma(nivel);
+         x++) {
+      int y = alturaPlataforma(nivel, x);
+
+      tft.drawFastVLine(
+        x, y, GROSOR_PLATAFORMA, ILI9341_RED
+      );
+    }
   }
 
   for (int i = 0; i < 3; i++) {
-    dibujarEscalera(
-      escalerasX[i],
-      escalerasY1[i],
-      escalerasY2[i]
+    int y1 = escaleraSuperior(i);
+    int y2 = escaleraInferior(i);
+
+    tft.drawFastVLine(
+      escalerasX[i], y1,
+      y2 - y1, ILI9341_CYAN
     );
+
+    tft.drawFastVLine(
+      escalerasX[i] + 14, y1,
+      y2 - y1, ILI9341_CYAN
+    );
+
+    for (int y = y1; y <= y2; y += 8) {
+      tft.drawFastHLine(
+        escalerasX[i], y,
+        15, ILI9341_CYAN
+      );
+    }
   }
 
   tft.fillRoundRect(
@@ -1014,7 +1095,7 @@ void setup() {
 
   dibujarMenu();
 
-  Serial.println("Mini Arcade v1.9.3 iniciado");
+  Serial.println("Mini Arcade v1.9.4 iniciado");
 }
 
 void loop() {
