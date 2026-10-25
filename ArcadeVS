@@ -28,7 +28,6 @@ int juegoSeleccionado = 0;
 
 const int UMBRAL_ARRIBA = 3000;
 const int UMBRAL_ABAJO = 1000;
-
 const int CENTRO_MIN = 1500;
 const int CENTRO_MAX = 2600;
 
@@ -51,25 +50,57 @@ const int MARIO_ALTO = 18;
 const int MARIO_MIN_X = 10;
 const int MARIO_MAX_X = 216;
 
-const int SUELO_MARIO = 275 - MARIO_ALTO;
-
-int marioX = 24;
-float marioY = 257.0f;
-
 const int VELOCIDAD_MARIO = 2;
 const unsigned long INTERVALO_MARIO = 30;
-
-unsigned long ultimoMovimientoMario = 0;
-
-float velocidadVertical = 0.0f;
 
 const float FUERZA_SALTO = -5.0f;
 const float GRAVEDAD = 0.45f;
 
+const int CANTIDAD_PLATAFORMAS = 4;
+
+const int plataformasY[CANTIDAD_PLATAFORMAS] = {
+  275, 215, 155, 95
+};
+
+const int escalerasX[3] = {
+  190, 38, 190
+};
+
+const int escalerasY1[3] = {
+  222, 162, 102
+};
+
+const int escalerasY2[3] = {
+  275, 215, 155
+};
+
+const int VELOCIDAD_ESCALERA = 2;
+const int TOLERANCIA_ESCALERA = 12;
+
+int marioX = 24;
+float marioY = 257.0f;
+
+float velocidadVertical = 0.0f;
+
 bool marioEnSuelo = true;
+bool marioEscalando = false;
+
+int plataformaActual = 0;
+int plataformaDestino = 0;
+
+int escaleraActual = -1;
+int direccionEscalera = 0;
+
+unsigned long ultimoMovimientoMario = 0;
+unsigned long ultimaFisica = 0;
+unsigned long ultimoMovimientoEscalera = 0;
 
 const unsigned long INTERVALO_FISICA = 20;
-unsigned long ultimaFisica = 0;
+const unsigned long INTERVALO_ESCALERA = 30;
+
+int posicionMarioEnPlataforma(int nivel) {
+  return plataformasY[nivel] - MARIO_ALTO;
+}
 
 void actualizarSeleccionMenu() {
   tft.setTextSize(2);
@@ -194,34 +225,18 @@ void dibujarEscalera(int x, int y1, int y2) {
 uint16_t colorFondo(int x, int y) {
   uint16_t color = ILI9341_BLACK;
 
-  const int plataformas[] = {
-    95, 155, 215, 275
-  };
-
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < CANTIDAD_PLATAFORMAS; i++) {
     if (x >= 10 && x < 230 &&
-        y >= plataformas[i] &&
-        y < plataformas[i] + 7) {
+        y >= plataformasY[i] &&
+        y < plataformasY[i] + 7) {
       color = ILI9341_RED;
     }
   }
 
-  const int escaleraX[] = {
-    190, 38, 190
-  };
-
-  const int escaleraY1[] = {
-    102, 162, 222
-  };
-
-  const int escaleraY2[] = {
-    155, 215, 275
-  };
-
   for (int i = 0; i < 3; i++) {
-    int ex = escaleraX[i];
-    int y1 = escaleraY1[i];
-    int y2 = escaleraY2[i];
+    int ex = escalerasX[i];
+    int y1 = escalerasY1[i];
+    int y2 = escalerasY2[i];
 
     bool lateral =
       y >= y1 && y < y2 &&
@@ -415,7 +430,7 @@ void dibujarMario() {
 }
 
 void iniciarSalto() {
-  if (!marioEnSuelo) {
+  if (!marioEnSuelo || marioEscalando) {
     return;
   }
 
@@ -427,8 +442,158 @@ void iniciarSalto() {
   Serial.println("Mario salta");
 }
 
-void actualizarMario() {
+bool iniciarEscalada(int direccion) {
+  if (!marioEnSuelo || marioEscalando) {
+    return false;
+  }
+
+  int indiceEscalera = -1;
+  int destino = plataformaActual;
+
+  if (direccion > 0) {
+    if (plataformaActual >= CANTIDAD_PLATAFORMAS - 1) {
+      return false;
+    }
+
+    indiceEscalera = plataformaActual;
+    destino = plataformaActual + 1;
+  }
+  else if (direccion < 0) {
+    if (plataformaActual <= 0) {
+      return false;
+    }
+
+    indiceEscalera = plataformaActual - 1;
+    destino = plataformaActual - 1;
+  }
+  else {
+    return false;
+  }
+
+  int posicionEscalera = escalerasX[indiceEscalera];
+
+  if (abs(marioX - posicionEscalera) >
+      TOLERANCIA_ESCALERA) {
+    return false;
+  }
+
+  int xAnterior = marioX;
+  int yAnterior = (int)marioY;
+
+  marioX = posicionEscalera;
+
+  moverSpriteMario(
+    xAnterior,
+    yAnterior,
+    marioX,
+    yAnterior
+  );
+
+  marioEscalando = true;
+  marioEnSuelo = false;
+
+  escaleraActual = indiceEscalera;
+  plataformaDestino = destino;
+  direccionEscalera = direccion;
+
+  velocidadVertical = 0.0f;
+  ultimoMovimientoEscalera = millis();
+
+  Serial.println("Mario comienza escalada");
+
+  return true;
+}
+
+void actualizarEscalada() {
+  if (!marioEscalando) {
+    return;
+  }
+
   unsigned long ahora = millis();
+
+  if (ahora - ultimoMovimientoEscalera <
+      INTERVALO_ESCALERA) {
+    return;
+  }
+
+  ultimoMovimientoEscalera = ahora;
+
+  int xAnterior = marioX;
+  int yAnterior = (int)marioY;
+
+  int yDestino = posicionMarioEnPlataforma(
+    plataformaDestino
+  );
+
+  int yNuevo = yAnterior;
+
+  if (direccionEscalera > 0) {
+    yNuevo -= VELOCIDAD_ESCALERA;
+
+    if (yNuevo <= yDestino) {
+      yNuevo = yDestino;
+    }
+  }
+  else {
+    yNuevo += VELOCIDAD_ESCALERA;
+
+    if (yNuevo >= yDestino) {
+      yNuevo = yDestino;
+    }
+  }
+
+  if (yNuevo != yAnterior) {
+    moverSpriteMario(
+      xAnterior,
+      yAnterior,
+      marioX,
+      yNuevo
+    );
+  }
+
+  marioY = (float)yNuevo;
+
+  if (yNuevo == yDestino) {
+    plataformaActual = plataformaDestino;
+
+    marioEscalando = false;
+    marioEnSuelo = true;
+
+    escaleraActual = -1;
+    direccionEscalera = 0;
+
+    velocidadVertical = 0.0f;
+
+    ultimaFisica = ahora;
+    ultimoMovimientoMario = ahora;
+
+    Serial.print("Plataforma actual: ");
+    Serial.println(plataformaActual);
+  }
+}
+
+void actualizarMario() {
+  if (marioEscalando) {
+    actualizarEscalada();
+    return;
+  }
+
+  unsigned long ahora = millis();
+
+  if (marioEnSuelo) {
+    int valorY = analogRead(JOY_Y);
+
+    if (valorY > UMBRAL_ARRIBA) {
+      if (iniciarEscalada(1)) {
+        return;
+      }
+    }
+    else if (valorY < UMBRAL_ABAJO) {
+      if (iniciarEscalada(-1)) {
+        return;
+      }
+    }
+  }
 
   bool actualizarHorizontal =
     ahora - ultimoMovimientoMario >=
@@ -475,9 +640,13 @@ void actualizarMario() {
       nuevaY += velocidadVertical;
       velocidadVertical += GRAVEDAD;
 
-      if (nuevaY >= SUELO_MARIO) {
-        nuevaY = SUELO_MARIO;
-        velocidadVertical = 0;
+      int sueloActual = posicionMarioEnPlataforma(
+        plataformaActual
+      );
+
+      if (nuevaY >= sueloActual) {
+        nuevaY = sueloActual;
+        velocidadVertical = 0.0f;
         marioEnSuelo = true;
 
         Serial.println("Mario aterrizo");
@@ -506,13 +675,24 @@ void dibujarDonkeyKong() {
   tft.fillScreen(ILI9341_BLACK);
 
   marioX = 24;
-  marioY = SUELO_MARIO;
+  plataformaActual = 0;
+  plataformaDestino = 0;
 
-  velocidadVertical = 0;
+  marioY = posicionMarioEnPlataforma(
+    plataformaActual
+  );
+
+  velocidadVertical = 0.0f;
+
   marioEnSuelo = true;
+  marioEscalando = false;
+
+  escaleraActual = -1;
+  direccionEscalera = 0;
 
   ultimoMovimientoMario = millis();
   ultimaFisica = millis();
+  ultimoMovimientoEscalera = millis();
 
   tft.setTextColor(ILI9341_YELLOW);
   tft.setTextSize(2);
@@ -528,23 +708,23 @@ void dibujarDonkeyKong() {
   tft.setCursor(175, 38);
   tft.print("VIDAS: 3");
 
-  const int plataformas[] = {
-    95, 155, 215, 275
-  };
-
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < CANTIDAD_PLATAFORMAS; i++) {
     tft.fillRect(
       10,
-      plataformas[i],
+      plataformasY[i],
       220,
       7,
       ILI9341_RED
     );
   }
 
-  dibujarEscalera(190, 102, 155);
-  dibujarEscalera(38, 162, 215);
-  dibujarEscalera(190, 222, 275);
+  for (int i = 0; i < 3; i++) {
+    dibujarEscalera(
+      escalerasX[i],
+      escalerasY1[i],
+      escalerasY2[i]
+    );
+  }
 
   tft.fillRoundRect(
     20, 75, 24, 20, 4,
@@ -703,7 +883,7 @@ void setup() {
 
   dibujarMenu();
 
-  Serial.println("Mini Arcade v1.7.3 iniciado");
+  Serial.println("Mini Arcade v1.8 iniciado");
 }
 
 void loop() {
