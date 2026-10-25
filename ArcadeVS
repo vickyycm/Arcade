@@ -1,0 +1,724 @@
+
+#include <Arduino.h>
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
+
+#define TFT_CS 10
+#define TFT_DC 9
+#define TFT_MOSI 11
+#define TFT_SCK 12
+
+#define JOY_X 4
+#define JOY_Y 5
+#define BTN_JUMP 6
+#define BUZZER 7
+
+Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
+
+enum EstadoSistema {
+  MENU_PRINCIPAL,
+  JUEGO_DONKEY_KONG,
+  JUEGO_PACMAN
+};
+
+EstadoSistema estadoActual = MENU_PRINCIPAL;
+
+int juegoSeleccionado = 0;
+
+const int UMBRAL_ARRIBA = 3000;
+const int UMBRAL_ABAJO = 1000;
+
+const int CENTRO_MIN = 1500;
+const int CENTRO_MAX = 2600;
+
+bool joystickListo = true;
+
+const unsigned long TIEMPO_MENU = 3000;
+const unsigned long REBOTE_BOTON = 30;
+
+unsigned long inicioPulsacion = 0;
+unsigned long ultimoCambioBoton = 0;
+
+bool botonEstable = false;
+bool ultimaLecturaBoton = false;
+bool pulsacionLargaDetectada = false;
+bool esperarSoltarBoton = false;
+
+const int MARIO_ANCHO = 14;
+const int MARIO_ALTO = 18;
+
+const int MARIO_MIN_X = 10;
+const int MARIO_MAX_X = 216;
+
+const int SUELO_MARIO = 275 - MARIO_ALTO;
+
+int marioX = 24;
+float marioY = 257.0f;
+
+const int VELOCIDAD_MARIO = 2;
+const unsigned long INTERVALO_MARIO = 30;
+
+unsigned long ultimoMovimientoMario = 0;
+
+float velocidadVertical = 0.0f;
+
+const float FUERZA_SALTO = -5.0f;
+const float GRAVEDAD = 0.45f;
+
+bool marioEnSuelo = true;
+
+const unsigned long INTERVALO_FISICA = 20;
+unsigned long ultimaFisica = 0;
+
+void actualizarSeleccionMenu() {
+  tft.setTextSize(2);
+
+  tft.drawRect(
+    15, 155, 210, 45,
+    juegoSeleccionado == 0
+      ? ILI9341_YELLOW
+      : ILI9341_DARKGREY
+  );
+
+  tft.setTextColor(
+    juegoSeleccionado == 0
+      ? ILI9341_YELLOW
+      : ILI9341_WHITE,
+    ILI9341_BLACK
+  );
+
+  tft.setCursor(40, 170);
+  tft.print("DONKEY KONG");
+
+  tft.drawRect(
+    15, 210, 210, 45,
+    juegoSeleccionado == 1
+      ? ILI9341_YELLOW
+      : ILI9341_DARKGREY
+  );
+
+  tft.setTextColor(
+    juegoSeleccionado == 1
+      ? ILI9341_YELLOW
+      : ILI9341_WHITE,
+    ILI9341_BLACK
+  );
+
+  tft.setCursor(70, 225);
+  tft.print("PAC-MAN");
+}
+
+void dibujarMenu() {
+  tft.fillScreen(ILI9341_BLACK);
+
+  tft.setTextColor(ILI9341_YELLOW);
+  tft.setTextSize(3);
+
+  tft.setCursor(30, 25);
+  tft.print("MINI");
+
+  tft.setCursor(30, 55);
+  tft.print("ARCADE");
+
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_CYAN);
+
+  tft.setCursor(95, 95);
+  tft.print("ESP32-S3");
+
+  tft.drawFastHLine(
+    20, 115, 200, ILI9341_BLUE
+  );
+
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(52, 130);
+  tft.print("SELECCIONAR JUEGO");
+
+  actualizarSeleccionMenu();
+
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_CYAN);
+
+  tft.setCursor(55, 275);
+  tft.print("JOYSTICK: ELEGIR");
+
+  tft.setCursor(55, 290);
+  tft.print("BOTON: CONFIRMAR");
+}
+
+void actualizarMenu() {
+  int valorY = analogRead(JOY_Y);
+
+  if (valorY >= CENTRO_MIN &&
+      valorY <= CENTRO_MAX) {
+    joystickListo = true;
+    return;
+  }
+
+  if (!joystickListo) return;
+
+  int nuevaSeleccion = juegoSeleccionado;
+
+  if (valorY > UMBRAL_ARRIBA) {
+    nuevaSeleccion = 0;
+    joystickListo = false;
+  }
+  else if (valorY < UMBRAL_ABAJO) {
+    nuevaSeleccion = 1;
+    joystickListo = false;
+  }
+
+  if (nuevaSeleccion != juegoSeleccionado) {
+    juegoSeleccionado = nuevaSeleccion;
+    actualizarSeleccionMenu();
+  }
+}
+
+void dibujarEscalera(int x, int y1, int y2) {
+  tft.drawFastVLine(
+    x, y1, y2 - y1, ILI9341_CYAN
+  );
+
+  tft.drawFastVLine(
+    x + 14, y1, y2 - y1, ILI9341_CYAN
+  );
+
+  for (int y = y1; y <= y2; y += 8) {
+    tft.drawFastHLine(
+      x, y, 15, ILI9341_CYAN
+    );
+  }
+}
+
+uint16_t colorFondo(int x, int y) {
+  uint16_t color = ILI9341_BLACK;
+
+  const int plataformas[] = {
+    95, 155, 215, 275
+  };
+
+  for (int i = 0; i < 4; i++) {
+    if (x >= 10 && x < 230 &&
+        y >= plataformas[i] &&
+        y < plataformas[i] + 7) {
+      color = ILI9341_RED;
+    }
+  }
+
+  const int escaleraX[] = {
+    190, 38, 190
+  };
+
+  const int escaleraY1[] = {
+    102, 162, 222
+  };
+
+  const int escaleraY2[] = {
+    155, 215, 275
+  };
+
+  for (int i = 0; i < 3; i++) {
+    int ex = escaleraX[i];
+    int y1 = escaleraY1[i];
+    int y2 = escaleraY2[i];
+
+    bool lateral =
+      y >= y1 && y < y2 &&
+      (x == ex || x == ex + 14);
+
+    bool peldano =
+      y >= y1 && y <= y2 &&
+      x >= ex && x < ex + 15 &&
+      (y - y1) % 8 == 0;
+
+    if (lateral || peldano) {
+      color = ILI9341_CYAN;
+    }
+  }
+
+  const int barrilX[] = {
+    70, 105, 147
+  };
+
+  const int barrilY[] = {
+    269, 269, 209
+  };
+
+  for (int i = 0; i < 3; i++) {
+    int dx = x - barrilX[i];
+    int dy = y - barrilY[i];
+
+    if (dx * dx + dy * dy <= 36) {
+      color = ILI9341_ORANGE;
+    }
+  }
+
+  if (x >= 192 && x < 202 &&
+      y >= 78 && y < 95) {
+    color = ILI9341_MAGENTA;
+  }
+
+  int dxPauline = x - 197;
+  int dyPauline = y - 72;
+
+  if (dxPauline * dxPauline +
+      dyPauline * dyPauline <= 36) {
+    color = ILI9341_YELLOW;
+  }
+
+  if (x >= 20 && x < 44 &&
+      y >= 75 && y < 95) {
+
+    bool esquina = false;
+
+    int cx = x;
+    int cy = y;
+
+    if (x < 24 && y < 79) {
+      cx = 24;
+      cy = 79;
+      esquina = true;
+    }
+    else if (x >= 40 && y < 79) {
+      cx = 39;
+      cy = 79;
+      esquina = true;
+    }
+    else if (x < 24 && y >= 91) {
+      cx = 24;
+      cy = 90;
+      esquina = true;
+    }
+    else if (x >= 40 && y >= 91) {
+      cx = 39;
+      cy = 90;
+      esquina = true;
+    }
+
+    if (!esquina ||
+        (x - cx) * (x - cx) +
+        (y - cy) * (y - cy) <= 16) {
+      color = ILI9341_ORANGE;
+    }
+  }
+
+  return color;
+}
+
+bool colorMario(
+  int pixelX,
+  int pixelY,
+  int posicionX,
+  int posicionY,
+  uint16_t &color
+) {
+  int localX = pixelX - posicionX;
+  int localY = pixelY - posicionY;
+
+  if (localX < 0 ||
+      localX >= MARIO_ANCHO ||
+      localY < 0 ||
+      localY >= MARIO_ALTO) {
+    return false;
+  }
+
+  if (localY < 5) {
+    color = ILI9341_RED;
+    return true;
+  }
+
+  if (localX >= 1 &&
+      localX <= 12 &&
+      localY >= 4) {
+    color = ILI9341_BLUE;
+    return true;
+  }
+
+  return false;
+}
+
+void moverSpriteMario(
+  int xAnterior,
+  int yAnterior,
+  int xNuevo,
+  int yNuevo
+) {
+  int izquierda = min(xAnterior, xNuevo);
+  int arriba = min(yAnterior, yNuevo);
+
+  int derecha = max(
+    xAnterior + MARIO_ANCHO,
+    xNuevo + MARIO_ANCHO
+  );
+
+  int abajo = max(
+    yAnterior + MARIO_ALTO,
+    yNuevo + MARIO_ALTO
+  );
+
+  tft.startWrite();
+
+  for (int y = arriba; y < abajo; y++) {
+    for (int x = izquierda; x < derecha; x++) {
+
+      uint16_t colorAnterior;
+      uint16_t colorNuevo;
+
+      bool teniaMario = colorMario(
+        x, y,
+        xAnterior, yAnterior,
+        colorAnterior
+      );
+
+      bool tieneMario = colorMario(
+        x, y,
+        xNuevo, yNuevo,
+        colorNuevo
+      );
+
+      if (!teniaMario) {
+        colorAnterior = colorFondo(x, y);
+      }
+
+      if (!tieneMario) {
+        colorNuevo = colorFondo(x, y);
+      }
+
+      if (colorAnterior != colorNuevo) {
+        tft.writePixel(x, y, colorNuevo);
+      }
+    }
+  }
+
+  tft.endWrite();
+}
+
+void dibujarMario() {
+  int y = (int)marioY;
+
+  tft.fillRect(
+    marioX + 1,
+    y + 4,
+    12,
+    14,
+    ILI9341_BLUE
+  );
+
+  tft.fillRect(
+    marioX,
+    y,
+    14,
+    5,
+    ILI9341_RED
+  );
+}
+
+void iniciarSalto() {
+  if (!marioEnSuelo) {
+    return;
+  }
+
+  velocidadVertical = FUERZA_SALTO;
+  marioEnSuelo = false;
+
+  ultimaFisica = millis();
+
+  Serial.println("Mario salta");
+}
+
+void actualizarMario() {
+  unsigned long ahora = millis();
+
+  bool actualizarHorizontal =
+    ahora - ultimoMovimientoMario >=
+    INTERVALO_MARIO;
+
+  bool actualizarVertical =
+    ahora - ultimaFisica >=
+    INTERVALO_FISICA;
+
+  if (!actualizarHorizontal &&
+      !actualizarVertical) {
+    return;
+  }
+
+  int xAnterior = marioX;
+  int yAnterior = (int)marioY;
+
+  int nuevaX = marioX;
+  float nuevaY = marioY;
+
+  if (actualizarHorizontal) {
+    ultimoMovimientoMario = ahora;
+
+    int valorX = analogRead(JOY_X);
+
+    if (valorX > 3000) {
+      nuevaX -= VELOCIDAD_MARIO;
+    }
+    else if (valorX < 1000) {
+      nuevaX += VELOCIDAD_MARIO;
+    }
+
+    nuevaX = constrain(
+      nuevaX,
+      MARIO_MIN_X,
+      MARIO_MAX_X
+    );
+  }
+
+  if (actualizarVertical) {
+    ultimaFisica = ahora;
+
+    if (!marioEnSuelo) {
+      nuevaY += velocidadVertical;
+      velocidadVertical += GRAVEDAD;
+
+      if (nuevaY >= SUELO_MARIO) {
+        nuevaY = SUELO_MARIO;
+        velocidadVertical = 0;
+        marioEnSuelo = true;
+
+        Serial.println("Mario aterrizo");
+      }
+    }
+  }
+
+  int yNuevo = (int)nuevaY;
+
+  if (nuevaX != xAnterior ||
+      yNuevo != yAnterior) {
+
+    moverSpriteMario(
+      xAnterior,
+      yAnterior,
+      nuevaX,
+      yNuevo
+    );
+  }
+
+  marioX = nuevaX;
+  marioY = nuevaY;
+}
+
+void dibujarDonkeyKong() {
+  tft.fillScreen(ILI9341_BLACK);
+
+  marioX = 24;
+  marioY = SUELO_MARIO;
+
+  velocidadVertical = 0;
+  marioEnSuelo = true;
+
+  ultimoMovimientoMario = millis();
+  ultimaFisica = millis();
+
+  tft.setTextColor(ILI9341_YELLOW);
+  tft.setTextSize(2);
+  tft.setCursor(48, 12);
+  tft.print("DONKEY KONG");
+
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_WHITE);
+
+  tft.setCursor(10, 38);
+  tft.print("SCORE: 0000");
+
+  tft.setCursor(175, 38);
+  tft.print("VIDAS: 3");
+
+  const int plataformas[] = {
+    95, 155, 215, 275
+  };
+
+  for (int i = 0; i < 4; i++) {
+    tft.fillRect(
+      10,
+      plataformas[i],
+      220,
+      7,
+      ILI9341_RED
+    );
+  }
+
+  dibujarEscalera(190, 102, 155);
+  dibujarEscalera(38, 162, 215);
+  dibujarEscalera(190, 222, 275);
+
+  tft.fillRoundRect(
+    20, 75, 24, 20, 4,
+    ILI9341_ORANGE
+  );
+
+  tft.fillCircle(
+    197, 72, 6,
+    ILI9341_YELLOW
+  );
+
+  tft.fillRect(
+    192, 78, 10, 17,
+    ILI9341_MAGENTA
+  );
+
+  tft.fillCircle(
+    70, 269, 6,
+    ILI9341_ORANGE
+  );
+
+  tft.fillCircle(
+    105, 269, 6,
+    ILI9341_ORANGE
+  );
+
+  tft.fillCircle(
+    147, 209, 6,
+    ILI9341_ORANGE
+  );
+
+  dibujarMario();
+
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setTextSize(1);
+
+  tft.setCursor(48, 305);
+  tft.print("MANTENER 3S: MENU");
+}
+
+void actualizarDonkeyKong() {
+  actualizarMario();
+}
+
+void dibujarPacman() {
+  tft.fillScreen(ILI9341_BLACK);
+
+  tft.setTextColor(ILI9341_YELLOW);
+  tft.setTextSize(3);
+
+  tft.setCursor(55, 75);
+  tft.print("PAC-MAN");
+
+  tft.setTextSize(2);
+  tft.setTextColor(ILI9341_WHITE);
+
+  tft.setCursor(30, 155);
+  tft.print("EN DESARROLLO");
+
+  tft.setTextSize(1);
+  tft.setCursor(45, 290);
+  tft.print("MANTENER 3S: MENU");
+}
+
+void iniciarJuego() {
+  if (juegoSeleccionado == 0) {
+    estadoActual = JUEGO_DONKEY_KONG;
+    dibujarDonkeyKong();
+
+    Serial.println("Iniciando Donkey Kong");
+  }
+  else {
+    estadoActual = JUEGO_PACMAN;
+    dibujarPacman();
+
+    Serial.println("Pac-Man en desarrollo");
+  }
+
+  esperarSoltarBoton = false;
+}
+
+void volverAlMenu() {
+  estadoActual = MENU_PRINCIPAL;
+  juegoSeleccionado = 0;
+  joystickListo = false;
+
+  dibujarMenu();
+
+  esperarSoltarBoton = true;
+
+  Serial.println("Regresando al menu");
+}
+
+void actualizarBoton() {
+  unsigned long ahora = millis();
+
+  bool lectura =
+    digitalRead(BTN_JUMP) == LOW;
+
+  if (lectura != ultimaLecturaBoton) {
+    ultimoCambioBoton = ahora;
+  }
+
+  ultimaLecturaBoton = lectura;
+
+  if (ahora - ultimoCambioBoton >= REBOTE_BOTON &&
+      lectura != botonEstable) {
+
+    botonEstable = lectura;
+
+    if (botonEstable) {
+      inicioPulsacion = ahora;
+      pulsacionLargaDetectada = false;
+    }
+    else {
+      if (esperarSoltarBoton) {
+        esperarSoltarBoton = false;
+      }
+      else if (!pulsacionLargaDetectada) {
+        if (estadoActual == MENU_PRINCIPAL) {
+          iniciarJuego();
+        }
+        else if (estadoActual == JUEGO_DONKEY_KONG) {
+          iniciarSalto();
+        }
+      }
+    }
+  }
+
+  if (botonEstable &&
+      !esperarSoltarBoton &&
+      !pulsacionLargaDetectada &&
+      estadoActual != MENU_PRINCIPAL &&
+      ahora - inicioPulsacion >= TIEMPO_MENU) {
+
+    pulsacionLargaDetectada = true;
+    volverAlMenu();
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(BTN_JUMP, INPUT_PULLUP);
+  pinMode(BUZZER, OUTPUT);
+
+  pinMode(JOY_X, INPUT);
+  pinMode(JOY_Y, INPUT);
+
+  analogReadResolution(12);
+
+  SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);
+
+  tft.begin();
+  tft.setRotation(0);
+
+  dibujarMenu();
+
+  Serial.println("Mini Arcade v1.7.3 iniciado");
+}
+
+void loop() {
+  actualizarBoton();
+
+  switch (estadoActual) {
+    case MENU_PRINCIPAL:
+      actualizarMenu();
+      break;
+
+    case JUEGO_DONKEY_KONG:
+      actualizarDonkeyKong();
+      break;
+
+    case JUEGO_PACMAN:
+      break;
+  }
+}
