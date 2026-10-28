@@ -475,6 +475,61 @@ void comerCasilla(int col, int fila) {
   }
 }
 
+// Redibuja solamente el area del sprite con un buffer de 16 bits.
+// El fondo y Pac-Man se componen en memoria antes de enviarse a la TFT.
+void dibujarPacmanSinParpadeo(int anteriorX, int anteriorY) {
+  const int ancho = 16;
+  const int alto = 16;
+  int izquierda = min(anteriorX, pacman.x) - 7;
+  int arriba = min(anteriorY, pacman.y) - 7;
+  GFXcanvas16 lienzo(ancho, alto);
+  lienzo.fillScreen(ILI9341_BLACK);
+
+  int colInicio = pisoCasilla(izquierda);
+  int filaInicio = pisoCasilla(arriba);
+  int colFin = pisoCasilla(izquierda + ancho - 1);
+  int filaFin = pisoCasilla(arriba + alto - 1);
+
+  for (int f = filaInicio; f <= filaFin; f++) {
+    for (int c = colInicio; c <= colFin; c++) {
+      if (f < 0 || f >= PM_FILAS || c < 0 || c >= PM_COLUMNAS) continue;
+      int px = c * PM_CASILLA - izquierda;
+      int py = f * PM_CASILLA - arriba;
+      char cas = laberinto[f][c];
+      if (cas == PM_PARED) {
+        if (f > 0 && laberinto[f - 1][c] != PM_PARED)
+          lienzo.drawFastHLine(px, py + 1, PM_CASILLA, ILI9341_BLUE);
+        if (f < PM_FILAS - 1 && laberinto[f + 1][c] != PM_PARED)
+          lienzo.drawFastHLine(px, py + PM_CASILLA - 2, PM_CASILLA, ILI9341_BLUE);
+        if (c > 0 && laberinto[f][c - 1] != PM_PARED)
+          lienzo.drawFastVLine(px + 1, py, PM_CASILLA, ILI9341_BLUE);
+        if (c < PM_COLUMNAS - 1 && laberinto[f][c + 1] != PM_PARED)
+          lienzo.drawFastVLine(px + PM_CASILLA - 2, py, PM_CASILLA, ILI9341_BLUE);
+      } else if (cas == PM_PUNTO) {
+        lienzo.fillRect(px + 3, py + 3, 2, 2, ILI9341_WHITE);
+      } else if (cas == PM_PODER) {
+        lienzo.fillCircle(px + 4, py + 4, 3, ILI9341_WHITE);
+      } else if (cas == PM_PUERTA) {
+        lienzo.drawFastHLine(px, py + 4, PM_CASILLA, ILI9341_PINK);
+      }
+    }
+  }
+
+  int sx = pacman.x - izquierda;
+  int sy = pacman.y - arriba;
+  lienzo.fillCircle(sx, sy, 3, ILI9341_YELLOW);
+  if (pacman.bocaAbierta && pacman.direccion != PM_QUIETO) {
+    int dx = PM_DX[pacman.direccion];
+    int dy = PM_DY[pacman.direccion];
+    lienzo.fillTriangle(sx, sy,
+      sx + dx * 4 - dy * 3, sy + dy * 4 - dx * 3,
+      sx + dx * 4 + dy * 3, sy + dy * 4 + dx * 3,
+      ILI9341_BLACK);
+  }
+  tft.drawRGBBitmap(pantallaX(izquierda), pantallaY(arriba),
+                    lienzo.getBuffer(), ancho, alto);
+}
+
 void moverPacman() {
   unsigned long ahora = millis();
   if (ahora - pacman.ultimoMovimiento < configActual(partidaPM.nivel).intervaloPacman) return;
@@ -497,10 +552,11 @@ void moverPacman() {
 
   if (pacman.direccion == PM_QUIETO) return;
 
-  restaurarFondo(pacman.x, pacman.y);
+  int anteriorX = pacman.x;
+  int anteriorY = pacman.y;
   avanzarPixel(pacman.x, pacman.y, pacman.direccion);
-  //hace el comer con la boca
-  if ((pacman.x + pacman.y) % 4 == 0) pacman.bocaAbierta = !pacman.bocaAbierta;  
+  if ((pacman.x + pacman.y) % 4 == 0) pacman.bocaAbierta = !pacman.bocaAbierta;
+  dibujarPacmanSinParpadeo(anteriorX, anteriorY);
 }
 
 //funciones fantasmas
