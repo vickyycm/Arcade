@@ -19,7 +19,8 @@ enum EstadoSistema {
   MENU_PRINCIPAL,
   JUEGO_DONKEY_KONG,
   JUEGO_PACMAN,
-  PANTALLA_GAME_OVER
+  PANTALLA_GAME_OVER,
+  PANTALLA_VICTORIA
 };
 
 EstadoSistema estadoActual = MENU_PRINCIPAL;
@@ -51,31 +52,25 @@ void actualizarSeleccionMenu() {
 
   tft.drawRect(
     15, 155, 210, 45,
-    juegoSeleccionado == 0
-      ? ILI9341_YELLOW : ILI9341_DARKGREY
+    juegoSeleccionado == 0 ? ILI9341_YELLOW : ILI9341_DARKGREY
   );
 
   tft.setTextColor(
-    juegoSeleccionado == 0
-      ? ILI9341_YELLOW : ILI9341_WHITE,
+    juegoSeleccionado == 0 ? ILI9341_YELLOW : ILI9341_WHITE,
     ILI9341_BLACK
   );
-
   tft.setCursor(40, 170);
   tft.print("DONKEY KONG");
 
   tft.drawRect(
     15, 210, 210, 45,
-    juegoSeleccionado == 1
-      ? ILI9341_YELLOW : ILI9341_DARKGREY
+    juegoSeleccionado == 1 ? ILI9341_YELLOW : ILI9341_DARKGREY
   );
 
   tft.setTextColor(
-    juegoSeleccionado == 1
-      ? ILI9341_YELLOW : ILI9341_WHITE,
+    juegoSeleccionado == 1 ? ILI9341_YELLOW : ILI9341_WHITE,
     ILI9341_BLACK
   );
-
   tft.setCursor(70, 225);
   tft.print("PAC-MAN");
 }
@@ -85,7 +80,6 @@ void dibujarMenu() {
 
   tft.setTextColor(ILI9341_YELLOW);
   tft.setTextSize(3);
-
   tft.setCursor(30, 25);
   tft.print("MINI");
 
@@ -97,9 +91,7 @@ void dibujarMenu() {
   tft.setCursor(95, 95);
   tft.print("ESP32-S3");
 
-  tft.drawFastHLine(
-    20, 115, 200, ILI9341_BLUE
-  );
+  tft.drawFastHLine(20, 115, 200, ILI9341_BLUE);
 
   tft.setTextColor(ILI9341_WHITE);
   tft.setCursor(52, 130);
@@ -118,8 +110,7 @@ void dibujarMenu() {
 void actualizarMenu() {
   int valorY = analogRead(JOY_Y);
 
-  if (valorY >= CENTRO_MIN &&
-      valorY <= CENTRO_MAX) {
+  if (valorY >= CENTRO_MIN && valorY <= CENTRO_MAX) {
     joystickListo = true;
     return;
   }
@@ -131,7 +122,6 @@ void actualizarMenu() {
   if (valorY > UMBRAL_ARRIBA) {
     nuevaSeleccion = 0;
     joystickListo = false;
-
   } else if (valorY < UMBRAL_ABAJO) {
     nuevaSeleccion = 1;
     joystickListo = false;
@@ -146,7 +136,6 @@ void actualizarMenu() {
 void iniciarJuego() {
   if (juegoSeleccionado == 0) {
     dkIniciar();
-
   } else {
     estadoActual = JUEGO_PACMAN;
     iniciarPacman();
@@ -166,7 +155,6 @@ void volverAlMenu() {
 
 void actualizarBoton() {
   unsigned long ahora = millis();
-
   bool lectura = digitalRead(BTN_JUMP) == LOW;
 
   if (lectura != ultimaLecturaBoton) {
@@ -184,34 +172,34 @@ void actualizarBoton() {
       inicioPulsacion = ahora;
       pulsacionLargaDetectada = false;
 
-    } else {
-      if (esperarSoltarBoton) {
-        esperarSoltarBoton = false;
+    } else if (esperarSoltarBoton) {
+      esperarSoltarBoton = false;
 
-      } else if (!pulsacionLargaDetectada) {
+    } else if (!pulsacionLargaDetectada) {
 
-        if (estadoActual == MENU_PRINCIPAL) {
-          iniciarJuego();
+      if (estadoActual == MENU_PRINCIPAL) {
+        iniciarJuego();
 
-        } else if (
-          estadoActual == JUEGO_DONKEY_KONG ||
-          estadoActual == PANTALLA_GAME_OVER
-        ) {
-          dkBotonCorto();
+      } else if (
+        estadoActual == JUEGO_DONKEY_KONG ||
+        estadoActual == PANTALLA_GAME_OVER ||
+        estadoActual == PANTALLA_VICTORIA
+      ) {
+        dkBotonCorto();
 
-        } else if (estadoActual == JUEGO_PACMAN) {
-          botonPacman();
-        }
+      } else if (estadoActual == JUEGO_PACMAN) {
+        botonPacman();
       }
     }
   }
 
-  if (botonEstable &&
-      !esperarSoltarBoton &&
-      !pulsacionLargaDetectada &&
-      estadoActual != MENU_PRINCIPAL &&
-      ahora - inicioPulsacion >= TIEMPO_MENU) {
-
+  if (
+    botonEstable &&
+    !esperarSoltarBoton &&
+    !pulsacionLargaDetectada &&
+    estadoActual != MENU_PRINCIPAL &&
+    ahora - inicioPulsacion >= TIEMPO_MENU
+  ) {
     pulsacionLargaDetectada = true;
     volverAlMenu();
   }
@@ -228,26 +216,19 @@ void setup() {
   digitalWrite(BUZZER, LOW);
   analogReadResolution(12);
 
-  SPI.begin(
-    TFT_SCK,
-    -1,
-    TFT_MOSI,
-    TFT_CS
-  );
-
+  SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);
   tft.begin();
   tft.setRotation(0);
 
   dibujarMenu();
 
-  Serial.println("Mini Arcade modular v2.0 iniciado");
+  Serial.println("Mini Arcade modular v2.1 iniciado");
 }
 
 void loop() {
   actualizarBoton();
 
   switch (estadoActual) {
-
     case MENU_PRINCIPAL:
       actualizarMenu();
       break;
@@ -261,6 +242,9 @@ void loop() {
       break;
 
     case PANTALLA_GAME_OVER:
+      break;
+
+    case PANTALLA_VICTORIA:
       break;
   }
 }
