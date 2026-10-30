@@ -94,6 +94,22 @@ struct Barril {
 
 Barril barriles[MAX_BARRILES];
 
+const int PUNTOS_BARRIL = 100;
+const int PUNTOS_PLATAFORMA = 200;
+const int PUNTOS_RESCATE = 1000;
+
+uint32_t dkPuntuacion = 0;
+uint32_t dkPuntuacionRender = 0;
+int dkNivelMaximo = 0;
+bool dkBarrilPuntuado[MAX_BARRILES] = {};
+bool dkBarrilSuperadoEnSalto[MAX_BARRILES] = {};
+
+void dkSumarPuntos(uint32_t cantidad) {
+  dkPuntuacion += cantidad;
+}
+
+
+
 // Snapshot privado del renderizador, nunca modificado por Core 0.
 Barril dkBarrilesRender[MAX_BARRILES];
 int dkMarioXRender = 24;
@@ -119,6 +135,13 @@ bool marioEscalando = false;
 bool marioVisible = true;
 
 int plataformaActual = 0;
+void dkRegistrarPlataforma() {
+  if (plataformaActual > dkNivelMaximo) {
+    dkSumarPuntos((plataformaActual - dkNivelMaximo) * PUNTOS_PLATAFORMA);
+    dkNivelMaximo = plataformaActual;
+  }
+}
+
 
 int plataformaDestino = 0;
 
@@ -662,6 +685,15 @@ void moverSpriteMario(
 
 }
 
+void actualizarMarcadorPuntos() {
+  tft.fillRect(10, 38, 152, 10, ILI9341_BLACK);
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(10, 38);
+  tft.print("SCORE: ");
+  tft.print(dkPuntuacionRender);
+}
+
 void actualizarMarcadorVidas() {
 
   tft.fillRect(
@@ -689,6 +721,8 @@ void reiniciarBarriles() {
   for (int i = 0; i < MAX_BARRILES; i++) {
 
     barriles[i].activo = false;
+    dkBarrilPuntuado[i] = false;
+    dkBarrilSuperadoEnSalto[i] = false;
 
     barriles[i].cayendo = false;
 
@@ -777,6 +811,8 @@ void crearBarril() {
     if (barriles[i].activo) continue;
 
     barriles[i].activo = true;
+    dkBarrilPuntuado[i] = false;
+    dkBarrilSuperadoEnSalto[i] = false;
 
     barriles[i].cayendo = false;
 
@@ -1138,6 +1174,7 @@ void actualizarEscalada() {
   if (yNuevo == yDestino) {
 
     plataformaActual = plataformaDestino;
+    dkRegistrarPlataforma();
 
     marioEscalando = false;
 
@@ -1153,6 +1190,31 @@ void actualizarEscalada() {
 
   }
 
+}
+
+void dkRegistrarBarrilesEnSalto() {
+  if (marioEnSuelo || marioEscalando) return;
+  int pies = (int)marioY + MARIO_ALTO;
+  for (int i = 0; i < MAX_BARRILES; i++) {
+    const Barril &b = barriles[i];
+    if (!b.activo || b.cayendo || b.nivel != plataformaActual ||
+        dkBarrilPuntuado[i]) continue;
+    bool cruceHorizontal = marioX < b.x + RADIO_BARRIL &&
+                           marioX + MARIO_ANCHO > b.x - RADIO_BARRIL;
+    if (cruceHorizontal && pies < b.y - RADIO_BARRIL) {
+      dkBarrilSuperadoEnSalto[i] = true;
+    }
+  }
+}
+
+void dkFinalizarSaltoPuntuado() {
+  for (int i = 0; i < MAX_BARRILES; i++) {
+    if (dkBarrilSuperadoEnSalto[i] && !dkBarrilPuntuado[i]) {
+      dkBarrilPuntuado[i] = true;
+      dkSumarPuntos(PUNTOS_BARRIL);
+    }
+    dkBarrilSuperadoEnSalto[i] = false;
+  }
 }
 
 void actualizarMario() {
@@ -1403,6 +1465,7 @@ void comprobarRescatePauline() {
 
   if (contactoX && contactoY) {
 
+    dkSumarPuntos(PUNTOS_RESCATE);
     estadoActual = PANTALLA_VICTORIA;
 
     Serial.println("Donkey Kong: Pauline rescatada");
@@ -1519,6 +1582,8 @@ void recibirImpacto() {
 
   }
 
+  for (int i = 0; i < MAX_BARRILES; i++)
+    dkBarrilSuperadoEnSalto[i] = false;
   reiniciarPosicionMario();
 
   marioInvulnerable = true;
@@ -1604,6 +1669,9 @@ void dibujarDonkeyKong() {
   direccionEscalera = 0;
 
   vidasMario = VIDAS_INICIALES;
+  dkPuntuacion = 0;
+  dkPuntuacionRender = 0;
+  dkNivelMaximo = 0;
 
   marioInvulnerable = false;
 
@@ -1631,7 +1699,7 @@ void dibujarDonkeyKong() {
 
   tft.setCursor(10, 38);
 
-  tft.print("SCORE: 0000");
+  actualizarMarcadorPuntos();
 
   dkVidasRender = vidasMario;
   actualizarMarcadorVidas();
@@ -1758,15 +1826,18 @@ void dibujarDonkeyKong() {
 
 void actualizarDonkeyKong() {
 
+  bool estabaEnAire = !marioEnSuelo && !marioEscalando;
   actualizarMario();
-
   actualizarBarriles();
-
   actualizarInvulnerabilidad();
-
-  comprobarRescatePauline();
-
   if (estadoActual == JUEGO_DONKEY_KONG) comprobarColisiones();
+  if (estadoActual != JUEGO_DONKEY_KONG) return;
+
+  if (!marioInvulnerable) {
+    if (!marioEnSuelo) dkRegistrarBarrilesEnSalto();
+    if (estabaEnAire && marioEnSuelo) dkFinalizarSaltoPuntuado();
+  }
+  comprobarRescatePauline();
 
 }
 
@@ -1792,6 +1863,7 @@ struct DkEstadoVisual {
   int marioY;
   bool visible;
   int vidas;
+  uint32_t puntuacion;
 };
 
 void dkRenderizar() {
@@ -1806,6 +1878,7 @@ void dkRenderizar() {
   nuevo.marioY = (int)marioY;
   nuevo.visible = marioVisible;
   nuevo.vidas = vidasMario;
+  nuevo.puntuacion = dkPuntuacion;
   for (int i = 0; i < MAX_BARRILES; ++i) nuevo.barriles[i] = barriles[i];
   xSemaphoreGive(dkMutex);
 
@@ -1819,6 +1892,10 @@ void dkRenderizar() {
   dkMarioVisibleRender = nuevo.visible;
   for (int i = 0; i < MAX_BARRILES; ++i) dkBarrilesRender[i] = nuevo.barriles[i];
 
+  if (nuevo.puntuacion != dkPuntuacionRender) {
+    dkPuntuacionRender = nuevo.puntuacion;
+    actualizarMarcadorPuntos();
+  }
   if (nuevo.vidas != dkVidasRender) {
     dkVidasRender = nuevo.vidas;
     actualizarMarcadorVidas();
