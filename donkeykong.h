@@ -1,5 +1,12 @@
 #pragma once
 
+// Efectos breves no bloqueantes para buzzer pasivo.
+void dkSonidoSalto() { tone(BUZZER, 784, 95); }
+void dkSonidoBarril() { tone(BUZZER, 220, 55); }
+void dkSonidoImpacto() { tone(BUZZER, 175, 220); }
+void dkSonidoGameOver() { tone(BUZZER, 110, 650); }
+void dkSonidoVictoria() { tone(BUZZER, 1047, 650); }
+
 const int MARIO_ANCHO = 14;
 
 const int MARIO_ALTO = 18;
@@ -777,6 +784,8 @@ void crearBarril() {
 
       direccionPlataforma(3);
 
+    dkSonidoBarril();
+
     return;
 
   }
@@ -1080,6 +1089,8 @@ void iniciarSalto() {
     return;
 
   }
+
+  dkSonidoSalto();
 
   velocidadVertical = FUERZA_SALTO;
 
@@ -1457,6 +1468,8 @@ bool colisionMarioBarril(const Barril &b) {
 
 void dibujarVictoria() {
 
+  dkSonidoVictoria();
+
   tft.fillScreen(ILI9341_BLACK);
 
   tft.setTextColor(ILI9341_YELLOW);
@@ -1522,6 +1535,8 @@ void comprobarRescatePauline() {
 }
 
 void dibujarGameOver() {
+
+  dkSonidoGameOver();
 
   tft.fillScreen(ILI9341_BLACK);
 
@@ -1624,6 +1639,8 @@ void recibirImpacto() {
   }
 
   vidasMario--;
+
+  dkSonidoImpacto();
 
   actualizarMarcadorVidas();
 
@@ -1891,6 +1908,8 @@ void actualizarDonkeyKong() {
 }
 
 void dkIniciar() {
+
+  noTone(BUZZER);
 
   estadoActual = JUEGO_DONKEY_KONG;
 
