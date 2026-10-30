@@ -17,34 +17,160 @@ const char PM_PODER = 'o';
 const char PM_VACIO = ' ';
 const char PM_PUERTA = '-';
 
-const char LABERINTO_BASE[PM_FILAS][PM_COLUMNAS + 1] = {
-  "############################",
-  "#o........................o#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#.........###--###.........#",
-  "#.........#      #.........#",
-  "#.........#      #.........#",
-  "#.........#      #.........#",
-  "#.........########.........#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#..........................#",
-  "#o........................o#",
-  "############################"
+const uint16_t PM_COLOR_PARED = 0x3A9F;
+
+//un laberinto por nivel
+const int PM_CANT_LABERINTOS = 5;
+const char LABERINTOS[PM_CANT_LABERINTOS][PM_FILAS][PM_COLUMNAS + 1] = {
+  //nivel 1
+    "############################",
+    "#o........................o#",
+    "#.#####.############.#####.#",
+    "#.#####.############.#####.#",
+    "#..........................#",
+    "#.####.###.######.###.####.#",
+    "#.####.###.######.###.####.#",
+    "#..........................#",
+    "#.####.##.########.##.####.#",
+    "#.####.##.########.##.####.#",
+    "#.####.##.########.##.####.#",
+    "#......##..........##......#",
+    "#.####.##.###--###.##.####.#",
+    "#.####.##.#      #.##.####.#",
+    "#.####.##.#      #.##.####.#",
+    "#.####.##.#      #.##.####.#",
+    "#.####.##.########.##.####.#",
+    "#..........................#",
+    "#.####.###.######.###.####.#",
+    "#.####.###.######.###.####.#",
+    "#..........................#",
+    "#.#####.############.#####.#",
+    "#.#####.############.#####.#",
+    "#o#####.############.#####o#",
+    "#.#####.############.#####.#",
+    "#..........................#",
+    "############################"
+  },
+  //nivel 2
+  {
+    "############################",
+    "#..........................#",
+    "#.####.##############.####.#",
+    "#o####.##############.####o#",
+    "#.####.##############.####.#",
+    "#..........................#",
+    "#.####.##.########.##.####.#",
+    "#.####.##.########.##.####.#",
+    "#......##..........##......#",
+    "######.##.########.##.######",
+    "######.##.########.##.######",
+    "######.##..........##.######",
+    "######.##.###--###.##.######",
+    "######.##.#      #.##.######",
+    "      .   #      #   .      ",
+    "######.##.#      #.##.######",
+    "######.##.########.##.######",
+    "######.##..........##.######",
+    "######.##.########.##.######",
+    "#..........................#",
+    "#.####.##############.####.#",
+    "#o####.##############.####o#",
+    "#.####.##############.####.#",
+    "#..........................#",
+    "#.########################.#",
+    "#..........................#",
+    "############################"
+  },
+  //nivel 3
+  {
+    "############################",
+    "#............##............#",
+    "#.####.#####.##.#####.####.#",
+    "#o####.#####.##.#####.####o#",
+    "#.####.#####.##.#####.####.#",
+    "#..........................#",
+    "#.####.##.########.##.####.#",
+    "#.####.##.########.##.####.#",
+    "#......##....##....##......#",
+    "######.#####.##.#####.######",
+    "######.#####.##.#####.######",
+    "######.##..........##.######",
+    "######.##.###--###.##.######",
+    "######.##.#      #.##.######",
+    "      .   #      #   .      ",
+    "######.##.#      #.##.######",
+    "######.##.########.##.######",
+    "######.##..........##.######",
+    "######.##.########.##.######",
+    "#............##............#",
+    "#.####.#####.##.#####.####.#",
+    "#o..##................##..o#",
+    "###.##.##.########.##.##.###",
+    "#......##....##....##......#",
+    "#.##########.##.##########.#",
+    "#..........................#",
+    "############################"
+  },
+  //nivel 4
+  {
+    "############################",
+    "#......#............#......#",
+    "#.####.#.####..####.#.####.#",
+    "#o####.#.####..####.#.####o#",
+    "#..........................#",
+    "#.##.#####.######.#####.##.#",
+    "#.##.#####.######.#####.##.#",
+    "#....##......##......##....#",
+    "####.##.####.##.####.##.####",
+    "####.##.####.##.####.##.####",
+    "#..........................#",
+    "#.####.##..........##.####.#",
+    "#.####.##.###--###.##.####.#",
+    "#......##.#      #.##......#",
+    "####.#.##.#      #.##.#.####",
+    "####.#.##.#      #.##.#.####",
+    "#....#.##.########.##.#....#",
+    "#.##...##..........##...##.#",
+    "#.##.####.########.####.##.#",
+    "#....#.......##.......#....#",
+    "####.#.#####.##.#####.#.####",
+    "#o.........#....#.........o#",
+    "#.####.###.#.##.#.###.####.#",
+    "#.####.###...##...###.####.#",
+    "#.####.#####.##.#####.####.#",
+    "#..........................#",
+    "############################"
+  },
+  //nivel 5
+  {
+    "############################",
+    "#.....#......##......#.....#",
+    "#.###.#.####.##.####.#.###.#",
+    "#o###.#.####.##.####.#.###o#",
+    "#............##............#",
+    "#.###.##.##.####.##.##.###.#",
+    "#.....##.##......##.##.....#",
+    "#####.##.####..####.##.#####",
+    "#####.##.####..####.##.#####",
+    "#..........................#",
+    "#.#####.#.###..###.#.#####.#",
+    "#.#####.#..........#.#####.#",
+    "#.....#.#.###--###.#.#.....#",
+    "#####.#.#.#      #.#.#.#####",
+    "      .   #      #   .      ",
+    "#####.###.#      #.###.#####",
+    "#.....###.########.###.....#",
+    "#.###.....#......#.....###.#",
+    "#.###.###.#.####.#.###.###.#",
+    "#.....###..........###.....#",
+    "###.#######.####.#######.###",
+    "#o..#.......#..#.......#..o#",
+    "#.#.#.#####.#..#.#####.#.#.#",
+    "#.#...#.....#..#.....#...#.#",
+    "#.#####.#####..#####.#####.#",
+    "#..........................#",
+    "############################"
+  }
 };
 char laberinto[PM_FILAS][PM_COLUMNAS];
 int puntosRestantes = 0;
@@ -72,8 +198,11 @@ struct ConfigNivel {
 };
 
 const ConfigNivel NIVELES[] = {
-  //nivel 1 - pacman/fantasma/asustado/duración/fantasmas
-  {   16,      19,       32,      7000,      2 },   
+  {   16,      19,       32,      7000,      2 },   //1
+  {   15,      17,       30,      6000,      3 },   //2
+  {   15,      16,       28,      5000,      3 },   //3
+  {   14,      15,       26,      4000,      4 },   //4
+  {   13,      14,       24,      3000,      4 },   //5
 };
 const int CANTIDAD_NIVELES = sizeof(NIVELES) / sizeof(NIVELES[0]);
 
@@ -89,7 +218,8 @@ enum EstadoPacman {
   PM_PAUSA,
   PM_MUERTE,           
   PM_NIVEL_COMPLETO,   
-  PM_GAME_OVER
+  PM_GAME_OVER,
+  PM_VICTORIA          //se completaron todos los niveles
 };
 
 EstadoPacman estadoPacman = PM_LISTO;
@@ -222,13 +352,13 @@ void dibujarCasilla(int col, int fila) {
 
   if (c == PM_PARED) {
     if (fila > 0 && laberinto[fila - 1][col] != PM_PARED)
-      tft.drawFastHLine(px, py + 1, PM_CASILLA, ILI9341_BLUE);
+      tft.fillRect(px, py + 1, PM_CASILLA, 2, PM_COLOR_PARED);
     if (fila < PM_FILAS - 1 && laberinto[fila + 1][col] != PM_PARED)
-      tft.drawFastHLine(px, py + PM_CASILLA - 2, PM_CASILLA, ILI9341_BLUE);
+      tft.fillRect(px, py + PM_CASILLA - 3, PM_CASILLA, 2, PM_COLOR_PARED);
     if (col > 0 && laberinto[fila][col - 1] != PM_PARED)
-      tft.drawFastVLine(px + 1, py, PM_CASILLA, ILI9341_BLUE);
+      tft.fillRect(px + 1, py, 2, PM_CASILLA, PM_COLOR_PARED);
     if (col < PM_COLUMNAS - 1 && laberinto[fila][col + 1] != PM_PARED)
-      tft.drawFastVLine(px + PM_CASILLA - 2, py, PM_CASILLA, ILI9341_BLUE);
+      tft.fillRect(px + PM_CASILLA - 3, py, 2, PM_CASILLA, PM_COLOR_PARED);
   } else if (c == PM_PUNTO) {
     tft.fillRect(px + 3, py + 3, 2, 2, ILI9341_WHITE);
   } else if (c == PM_PODER) {
@@ -334,10 +464,12 @@ void sonidoComer() {
 //funciones iniciales
 
 void cargarLaberinto() {
+  //cada nivel usa su laberinto 
+  int indice = min(partidaPM.nivel, PM_CANT_LABERINTOS - 1);
   puntosRestantes = 0;
   for (int f = 0; f < PM_FILAS; f++) {
     for (int c = 0; c < PM_COLUMNAS; c++) {
-      laberinto[f][c] = LABERINTO_BASE[f][c];
+      laberinto[f][c] = LABERINTOS[indice][f][c];
       if (laberinto[f][c] == PM_PUNTO || laberinto[f][c] == PM_PODER)
         puntosRestantes++;
     }
@@ -475,8 +607,9 @@ void comerCasilla(int col, int fila) {
   }
 }
 
-// Redibuja solamente el area del sprite con un buffer de 16 bits.
-// El fondo y Pac-Man se componen en memoria antes de enviarse a la TFT.
+//SANTI ACA
+//redibuja solamente el area del sprite con un buffer de 16 bits.
+//el fondo y Pac-Man se componen en memoria antes de enviarse a la TFT.
 void dibujarPacmanSinParpadeo(int anteriorX, int anteriorY) {
   const int ancho = 16;
   const int alto = 16;
@@ -498,13 +631,13 @@ void dibujarPacmanSinParpadeo(int anteriorX, int anteriorY) {
       char cas = laberinto[f][c];
       if (cas == PM_PARED) {
         if (f > 0 && laberinto[f - 1][c] != PM_PARED)
-          lienzo.drawFastHLine(px, py + 1, PM_CASILLA, ILI9341_BLUE);
+          lienzo.fillRect(px, py + 1, PM_CASILLA, 2, PM_COLOR_PARED);
         if (f < PM_FILAS - 1 && laberinto[f + 1][c] != PM_PARED)
-          lienzo.drawFastHLine(px, py + PM_CASILLA - 2, PM_CASILLA, ILI9341_BLUE);
+          lienzo.fillRect(px, py + PM_CASILLA - 3, PM_CASILLA, 2, PM_COLOR_PARED);
         if (c > 0 && laberinto[f][c - 1] != PM_PARED)
-          lienzo.drawFastVLine(px + 1, py, PM_CASILLA, ILI9341_BLUE);
+          lienzo.fillRect(px + 1, py, 2, PM_CASILLA, PM_COLOR_PARED);
         if (c < PM_COLUMNAS - 1 && laberinto[f][c + 1] != PM_PARED)
-          lienzo.drawFastVLine(px + PM_CASILLA - 2, py, PM_CASILLA, ILI9341_BLUE);
+          lienzo.fillRect(px + PM_CASILLA - 3, py, 2, PM_CASILLA, PM_COLOR_PARED);
       } else if (cas == PM_PUNTO) {
         lienzo.fillRect(px + 3, py + 3, 2, 2, ILI9341_WHITE);
       } else if (cas == PM_PODER) {
@@ -604,7 +737,7 @@ DireccionPM elegirDireccion(int i) {
 
   DireccionPM mejor = reversa;
   long mejorDistancia = 0x7FFFFFFF;
-  //desempate: arriba - izquierda - abajo - derecha
+  //desempate arriba - izquierda - abajo - derecha
   for (int d = 0; d < 4; d++) {
     if ((DireccionPM)d == reversa || !puedeMoverse(col, fila, (DireccionPM)d)) continue;
     long dx = col + PM_DX[d] - objCol;
@@ -682,7 +815,7 @@ void actualizarModosFantasmas() {
   }
 }
 
-//Trae cuando un fantasma agarra a pacman
+//trae cuando un fantasma agarra a pacman
 bool revisarChoques() {
   for (int i = 0; i < configActual(partidaPM.nivel).cantidadFantasmas; i++) {
     Fantasma &g = fantasmas[i];
@@ -736,7 +869,7 @@ void botonPacman() {
     if (finAsustado != 0) finAsustado += pausa;
     cambiarEstadoPacman(PM_JUGANDO);
     mensajeInferior("", ILI9341_BLACK);
-  } else if (estadoPacman == PM_GAME_OVER) {
+  } else if (estadoPacman == PM_GAME_OVER || estadoPacman == PM_VICTORIA) {
     iniciarPacman();
   }
 }
@@ -811,14 +944,22 @@ void actualizarPacman() {
 
     case PM_NIVEL_COMPLETO:
       if (enEstado >= PM_TIEMPO_NIVEL) {
-        //ALGORITMO: sube el contador, suben los puntos y se aplica la configuración del nuevo nivel
-        partidaPM.nivel++;
-        cargarLaberinto();
-        prepararNivel();
+        //sube el contador, suben los puntos y se aplica la configuración del nuevo nivel
+        if (partidaPM.nivel + 1 >= CANTIDAD_NIVELES) {
+          //era el ultimo nivel gana la partida
+          reportarEventoPacman("victoria");
+          mensajeInferior("GANASTE!", ILI9341_GREEN);
+          cambiarEstadoPacman(PM_VICTORIA);
+        } else {
+          partidaPM.nivel++;
+          cargarLaberinto();
+          prepararNivel();
+        }
       }
       break;
 
     case PM_GAME_OVER:
+    case PM_VICTORIA:
       //espera la el toque corto del boton 
       break;
   }
