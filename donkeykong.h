@@ -94,6 +94,18 @@ struct Barril {
 
 Barril barriles[MAX_BARRILES];
 
+// Snapshot privado del renderizador, nunca modificado por Core 0.
+Barril dkBarrilesRender[MAX_BARRILES];
+int dkMarioXRender = 24;
+int dkMarioYRender = 257;
+bool dkMarioVisibleRender = true;
+int dkVidasRender = 3;
+
+SemaphoreHandle_t dkMutex = nullptr;
+volatile bool dkSaltoPendiente = false;
+volatile bool dkRenderInicializado = false;
+
+
 int marioX = 24;
 
 float marioY = 257.0f;
@@ -384,11 +396,11 @@ bool puntoMario(
 
 ) {
 
-  if (!marioVisible) return false;
+  if (!dkMarioVisibleRender) return false;
 
-  int lx = x - marioX;
+  int lx = x - dkMarioXRender;
 
-  int ly = y - (int)marioY;
+  int ly = y - (int)dkMarioYRender;
 
   if (lx < 0 || lx >= MARIO_ANCHO ||
 
@@ -510,7 +522,7 @@ void renderizarRegion(
 
       for (int i = 0; i < MAX_BARRILES; i++) {
 
-        const Barril &b = barriles[i];
+        const Barril &b = dkBarrilesRender[i];
 
         if (!b.activo) continue;
 
@@ -532,15 +544,15 @@ void renderizarRegion(
 
       bool marioEnRegion =
 
-        marioVisible &&
+        dkMarioVisibleRender &&
 
-        marioX < bloqueX + ancho &&
+        dkMarioXRender < bloqueX + ancho &&
 
-        marioX + MARIO_ANCHO > bloqueX &&
+        dkMarioXRender + MARIO_ANCHO > bloqueX &&
 
-        (int)marioY < bloqueY + alto &&
+        (int)dkMarioYRender < bloqueY + alto &&
 
-        (int)marioY + MARIO_ALTO > bloqueY;
+        (int)dkMarioYRender + MARIO_ALTO > bloqueY;
 
       for (int fy = 0; fy < alto; fy++) {
 
@@ -556,7 +568,7 @@ void renderizarRegion(
 
             if (puntoBarril(
 
-              x, y, barriles[indices[j]]
+              x, y, dkBarrilesRender[indices[j]]
 
             )) {
 
@@ -608,13 +620,13 @@ void renderizarMarioActual() {
 
   renderizarRegion(
 
-    marioX,
+    dkMarioXRender,
 
-    (int)marioY,
+    (int)dkMarioYRender,
 
-    marioX + MARIO_ANCHO,
+    dkMarioXRender + MARIO_ANCHO,
 
-    (int)marioY + MARIO_ALTO
+    (int)dkMarioYRender + MARIO_ALTO
 
   );
 
@@ -648,12 +660,6 @@ void moverSpriteMario(
 
   marioY = (float)yNuevo;
 
-  renderizarRegion(
-
-    izquierda, arriba, derecha, abajo
-
-  );
-
 }
 
 void actualizarMarcadorVidas() {
@@ -674,7 +680,7 @@ void actualizarMarcadorVidas() {
 
   tft.print("VIDAS: ");
 
-  tft.print(vidasMario);
+  tft.print(dkVidasRender);
 
 }
 
@@ -930,14 +936,6 @@ void actualizarBarriles() {
 
   if (!generar && !mover) return;
 
-  Barril anteriores[MAX_BARRILES];
-
-  for (int i = 0; i < MAX_BARRILES; i++) {
-
-    anteriores[i] = barriles[i];
-
-  }
-
   if (generar) {
 
     ultimaAparicionBarril = ahora;
@@ -958,125 +956,6 @@ void actualizarBarriles() {
 
   }
 
-  for (int i = 0; i < MAX_BARRILES; i++) {
-
-    const Barril &antes = anteriores[i];
-
-    const Barril &despues = barriles[i];
-
-    if (!antes.activo &&
-
-        !despues.activo) {
-
-      continue;
-
-    }
-
-    if (antes.activo &&
-
-        despues.activo &&
-
-        antes.x == despues.x &&
-
-        antes.y == despues.y) {
-
-      continue;
-
-    }
-
-    int izquierda = 240;
-
-    int arriba = 320;
-
-    int derecha = 0;
-
-    int abajo = 0;
-
-    if (antes.activo) {
-
-      izquierda = min(
-
-        izquierda,
-
-        antes.x - RADIO_BARRIL
-
-      );
-
-      arriba = min(
-
-        arriba,
-
-        antes.y - RADIO_BARRIL
-
-      );
-
-      derecha = max(
-
-        derecha,
-
-        antes.x + RADIO_BARRIL + 1
-
-      );
-
-      abajo = max(
-
-        abajo,
-
-        antes.y + RADIO_BARRIL + 1
-
-      );
-
-    }
-
-    if (despues.activo) {
-
-      izquierda = min(
-
-        izquierda,
-
-        despues.x - RADIO_BARRIL
-
-      );
-
-      arriba = min(
-
-        arriba,
-
-        despues.y - RADIO_BARRIL
-
-      );
-
-      derecha = max(
-
-        derecha,
-
-        despues.x + RADIO_BARRIL + 1
-
-      );
-
-      abajo = max(
-
-        abajo,
-
-        despues.y + RADIO_BARRIL + 1
-
-      );
-
-    }
-
-    renderizarRegion(
-
-      izquierda,
-
-      arriba,
-
-      derecha,
-
-      abajo
-
-    );
-
-  }
 
 }
 
@@ -1526,8 +1405,6 @@ void comprobarRescatePauline() {
 
     estadoActual = PANTALLA_VICTORIA;
 
-    dibujarVictoria();
-
     Serial.println("Donkey Kong: Pauline rescatada");
 
   }
@@ -1612,20 +1489,6 @@ void reiniciarPosicionMario() {
 
   ultimoMovimientoEscalera = ahora;
 
-  renderizarRegion(
-
-    xAnterior,
-
-    yAnterior,
-
-    xAnterior + MARIO_ANCHO,
-
-    yAnterior + MARIO_ALTO
-
-  );
-
-  renderizarMarioActual();
-
 }
 
 void recibirImpacto() {
@@ -1642,8 +1505,6 @@ void recibirImpacto() {
 
   dkSonidoImpacto();
 
-  actualizarMarcadorVidas();
-
   Serial.print("Impacto. Vidas restantes: ");
 
   Serial.println(vidasMario);
@@ -1653,8 +1514,6 @@ void recibirImpacto() {
     vidasMario = 0;
 
     estadoActual = PANTALLA_GAME_OVER;
-
-    dibujarGameOver();
 
     return;
 
@@ -1716,8 +1575,6 @@ void actualizarInvulnerabilidad() {
 
     marioVisible = nuevaVisibilidad;
 
-    renderizarMarioActual();
-
   }
 
 }
@@ -1776,6 +1633,7 @@ void dibujarDonkeyKong() {
 
   tft.print("SCORE: 0000");
 
+  dkVidasRender = vidasMario;
   actualizarMarcadorVidas();
 
   for (int nivel = 0;
@@ -1881,6 +1739,11 @@ void dibujarDonkeyKong() {
   );
 
   prepararFondoDK();
+  dkMarioXRender = marioX;
+  dkMarioYRender = (int)marioY;
+  dkMarioVisibleRender = marioVisible;
+  dkVidasRender = vidasMario;
+  for (int i = 0; i < MAX_BARRILES; ++i) dkBarrilesRender[i] = barriles[i];
   renderizarMarioActual();
 
   tft.setTextColor(ILI9341_WHITE);
@@ -1907,35 +1770,103 @@ void actualizarDonkeyKong() {
 
 }
 
+// El Core 0 solo actualiza estado y nunca accede a la TFT.
+void dkPasoLogica() {
+  if (dkMutex == nullptr) return;
+  if (xSemaphoreTake(dkMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+  if (estadoActual == JUEGO_DONKEY_KONG) {
+    if (dkSaltoPendiente) {
+      dkSaltoPendiente = false;
+      iniciarSalto();
+    }
+    actualizarDonkeyKong();
+  } else {
+    dkSaltoPendiente = false;
+  }
+  xSemaphoreGive(dkMutex);
+}
+
+struct DkEstadoVisual {
+  Barril barriles[MAX_BARRILES];
+  int marioX;
+  int marioY;
+  bool visible;
+  int vidas;
+};
+
+void dkRenderizar() {
+  if (!dkRenderInicializado || dkMutex == nullptr) return;
+  DkEstadoVisual nuevo;
+  if (xSemaphoreTake(dkMutex, pdMS_TO_TICKS(2)) != pdTRUE) return;
+  if (estadoActual != JUEGO_DONKEY_KONG) {
+    xSemaphoreGive(dkMutex);
+    return;
+  }
+  nuevo.marioX = marioX;
+  nuevo.marioY = (int)marioY;
+  nuevo.visible = marioVisible;
+  nuevo.vidas = vidasMario;
+  for (int i = 0; i < MAX_BARRILES; ++i) nuevo.barriles[i] = barriles[i];
+  xSemaphoreGive(dkMutex);
+
+  int viejoX = dkMarioXRender, viejoY = dkMarioYRender;
+  bool viejoVisible = dkMarioVisibleRender;
+  Barril anteriores[MAX_BARRILES];
+  for (int i = 0; i < MAX_BARRILES; ++i) anteriores[i] = dkBarrilesRender[i];
+
+  dkMarioXRender = nuevo.marioX;
+  dkMarioYRender = nuevo.marioY;
+  dkMarioVisibleRender = nuevo.visible;
+  for (int i = 0; i < MAX_BARRILES; ++i) dkBarrilesRender[i] = nuevo.barriles[i];
+
+  if (nuevo.vidas != dkVidasRender) {
+    dkVidasRender = nuevo.vidas;
+    actualizarMarcadorVidas();
+  }
+  if (viejoX != nuevo.marioX || viejoY != nuevo.marioY || viejoVisible != nuevo.visible) {
+    renderizarRegion(min(viejoX, nuevo.marioX), min(viejoY, nuevo.marioY),
+      max(viejoX, nuevo.marioX) + MARIO_ANCHO,
+      max(viejoY, nuevo.marioY) + MARIO_ALTO);
+  }
+  for (int i = 0; i < MAX_BARRILES; ++i) {
+    const Barril &a = anteriores[i], &b = dkBarrilesRender[i];
+    if (!a.activo && !b.activo) continue;
+    if (a.activo && b.activo && a.x == b.x && a.y == b.y) continue;
+    int izq = 240, sup = 320, der = 0, inf = 0;
+    if (a.activo) {
+      izq = min(izq, a.x - RADIO_BARRIL);
+      sup = min(sup, a.y - RADIO_BARRIL);
+      der = max(der, a.x + RADIO_BARRIL + 1);
+      inf = max(inf, a.y + RADIO_BARRIL + 1);
+    }
+    if (b.activo) {
+      izq = min(izq, b.x - RADIO_BARRIL);
+      sup = min(sup, b.y - RADIO_BARRIL);
+      der = max(der, b.x + RADIO_BARRIL + 1);
+      inf = max(inf, b.y + RADIO_BARRIL + 1);
+    }
+    renderizarRegion(izq, sup, der, inf);
+  }
+}
+
+// Core 1: inicializacion, menu, TFT y reinicio.
 void dkIniciar() {
-
+  dkRenderInicializado = false;
+  if (dkMutex != nullptr) xSemaphoreTake(dkMutex, portMAX_DELAY);
   noTone(BUZZER);
-
   estadoActual = JUEGO_DONKEY_KONG;
-
   dibujarDonkeyKong();
-
+  dkRenderInicializado = true;
+  if (dkMutex != nullptr) xSemaphoreGive(dkMutex);
 }
 
-void dkActualizar() {
-
-  actualizarDonkeyKong();
-
-}
+void dkActualizar() { dkRenderizar(); }
 
 void dkBotonCorto() {
-
   if (estadoActual == JUEGO_DONKEY_KONG) {
-
-    iniciarSalto();
-
+    dkSaltoPendiente = true;
   } else if (estadoActual == PANTALLA_GAME_OVER ||
-
              estadoActual == PANTALLA_VICTORIA) {
-
     dkIniciar();
-
   }
-
 }
-
