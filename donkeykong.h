@@ -55,9 +55,16 @@ const int VELOCIDAD_BARRIL = 2;
 
 const int SEPARACION_BARRILES = 85;
 
-const unsigned long INTERVALO_BARRIL = 40;
+const unsigned long INTERVALOS_BARRIL[4] = {40, 35, 30, 25};
 
-const unsigned long INTERVALO_APARICION = 2500;
+const unsigned long INTERVALOS_APARICION[4] = {2500, 2200, 1900, 1600};
+
+unsigned long dkInicioPartida = 0;
+
+int dkNivelDificultad() {
+  unsigned long segundos = (millis() - dkInicioPartida) / 1000UL;
+  return min((unsigned long)3, segundos / 30UL);
+}
 
 const int BUFFER_ANCHO = 32;
 
@@ -962,13 +969,13 @@ void actualizarBarriles() {
 
     ahora - ultimaAparicionBarril >=
 
-    INTERVALO_APARICION;
+    INTERVALOS_APARICION[dkNivelDificultad()];
 
   bool mover =
 
     ahora - ultimoMovimientoBarriles >=
 
-    INTERVALO_BARRIL;
+    INTERVALOS_BARRIL[dkNivelDificultad()];
 
   if (!generar && !mover) return;
 
@@ -1669,6 +1676,7 @@ void dibujarDonkeyKong() {
   direccionEscalera = 0;
 
   vidasMario = VIDAS_INICIALES;
+  dkInicioPartida = millis();
   dkPuntuacion = 0;
   dkPuntuacionRender = 0;
   dkNivelMaximo = 0;
