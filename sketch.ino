@@ -40,6 +40,7 @@ bool ultimaLecturaBoton = false;
 bool pulsacionLargaDetectada = false;
 bool esperarSoltarBoton = false;
 
+#include "musica.h"
 #include "donkeykong.h"
 #include "pacman.h"
 
@@ -174,6 +175,7 @@ void setup() {
   SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);
   tft.begin();
   tft.setRotation(0);
+  musicaIniciar();
   dkMutex = xSemaphoreCreateMutex();
   if (dkMutex == nullptr) {
     Serial.println("Error al crear mutex DK");
@@ -201,6 +203,14 @@ void loop() {
   }
   pantallaAnterior = actual;
   actualizarBoton();
+  int temaMusical = -1;
+  if (estadoActual == MENU_PRINCIPAL) temaMusical = 0;
+  else if (estadoActual == JUEGO_DONKEY_KONG) {
+    temaMusical = (int)dkEtapaActual;
+    if (dkEtapaActual == DK_ETAPA_REMACHES && remRescateActivo)
+      temaMusical = -1;
+  }
+  musicaActualizar(temaMusical);
   switch (estadoActual) {
     case MENU_PRINCIPAL: actualizarMenu(); break;
     case JUEGO_DONKEY_KONG: dkActualizar(); break;
