@@ -1,4 +1,3 @@
-
 #include <Arduino.h>
 #include <SPI.h>
 #include <Adafruit_GFX.h>
@@ -198,7 +197,7 @@ void loop() {
       (actual == PANTALLA_GAME_OVER || actual == PANTALLA_VICTORIA)) {
     dkRenderInicializado = false;
     if (actual == PANTALLA_GAME_OVER) dibujarGameOver();
-    else dibujarVictoria();
+    else if (dkEtapaActual != DK_ETAPA_REMACHES) dibujarVictoria();
   }
   pantallaAnterior = actual;
   actualizarBoton();
