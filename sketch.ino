@@ -1,3 +1,4 @@
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <Adafruit_GFX.h>
@@ -10,7 +11,6 @@
 #define JOY_X 4
 #define JOY_Y 5
 #define BTN_JUMP 6
-#define BUZZER 7
 
 Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 
@@ -40,7 +40,6 @@ bool ultimaLecturaBoton = false;
 bool pulsacionLargaDetectada = false;
 bool esperarSoltarBoton = false;
 
-#include "musica.h"
 #include "donkeykong.h"
 #include "pacman.h"
 
@@ -167,15 +166,12 @@ void tareaLogicaDK(void *parametro) {
 void setup() {
   Serial.begin(115200);
   pinMode(BTN_JUMP, INPUT_PULLUP);
-  pinMode(BUZZER, OUTPUT);
   pinMode(JOY_X, INPUT);
   pinMode(JOY_Y, INPUT);
-  digitalWrite(BUZZER, LOW);
   analogReadResolution(12);
   SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);
   tft.begin();
   tft.setRotation(0);
-  musicaIniciar();
   dkMutex = xSemaphoreCreateMutex();
   if (dkMutex == nullptr) {
     Serial.println("Error al crear mutex DK");
@@ -203,14 +199,7 @@ void loop() {
   }
   pantallaAnterior = actual;
   actualizarBoton();
-  int temaMusical = -1;
-  if (estadoActual == MENU_PRINCIPAL) temaMusical = 0;
-  else if (estadoActual == JUEGO_DONKEY_KONG) {
-    temaMusical = (int)dkEtapaActual;
-    if (dkEtapaActual == DK_ETAPA_REMACHES && remRescateActivo)
-      temaMusical = -1;
-  }
-  musicaActualizar(temaMusical);
+
   switch (estadoActual) {
     case MENU_PRINCIPAL: actualizarMenu(); break;
     case JUEGO_DONKEY_KONG: dkActualizar(); break;
