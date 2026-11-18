@@ -64,7 +64,7 @@ void dkAscensoresIniciar() {
 void dkAscensoresGolpe() {
   if (ascInvulnerable) return;
   vidasMario--;
-  dkSonidoImpacto();
+
   if (vidasMario <= 0) {
     vidasMario = 0;
     estadoActual = PANTALLA_GAME_OVER;
@@ -84,8 +84,8 @@ void dkAscensoresPasoLogica() {
   unsigned long ahora = millis();
   if (ahora - ascUltimoTick < ASC_TICK) return;
   ascUltimoTick = ahora;
-  // Leer el boton solo en Ascensores, sin cambiar sketch.ino ni Pac-Man.
-  bool botonPresionado = digitalRead(BTN_JUMP) == LOW;
+
+bool botonPresionado = digitalRead(BTN_JUMP) == LOW;
   if (botonPresionado && !ascBotonAnterior) {
     ascInicioPulsacion = ahora;
   }
@@ -97,8 +97,8 @@ void dkAscensoresPasoLogica() {
     ascIgnorarSaltoAlSoltar = true;
   }
   ascBotonAnterior = botonPresionado;
-  // sketch.ino tambien notifica al soltar. Evitar un segundo salto.
-  if (dkSaltoPendiente) {
+
+if (dkSaltoPendiente) {
     if (!ascIgnorarSaltoAlSoltar) {
       ascSaltoEnCola = true;
       ascSaltoRegistrado = ahora;
@@ -151,7 +151,7 @@ void dkAscensoresPasoLogica() {
       ascMontado = -1;
       ascSuelo = false;
       ascVy = -5.0f;
-      dkSonidoSalto();
+
     } else if (ascLifts[i].y <= ASC_PISOS[i + 1] + 1 &&
                ascLifts[i].dir == 1) {
       ascPiso = i + 1;
@@ -167,7 +167,7 @@ void dkAscensoresPasoLogica() {
       ascSaltoEnCola = false;
       ascSuelo = false;
       ascVy = -5.0f;
-      dkSonidoSalto();
+
     }
     if (!ascSuelo) {
       ascMarioY += ascVy;
@@ -183,8 +183,8 @@ void dkAscensoresPasoLogica() {
       int i = ascPiso;
       float centro = ascMarioX + ASC_MW / 2.0f;
       float pisoElev = ascLifts[i].y;
-      // Solo se aborda cuando el elevador esta cerca del piso inferior.
-      if (fabsf(centro - ASC_X[i]) <= 13 &&
+
+    if (fabsf(centro - ASC_X[i]) <= 13 &&
           fabsf(pisoElev - (ASC_PISOS[i] - 1)) <= 10 &&
           ascLifts[i].dir < 0) {
         ascMontado = i;
@@ -344,8 +344,8 @@ void dkAscensoresRenderizar() {
     ascRegion(0, 55, 240, 295, actual);
     ascAnteriorValido = true;
   } else {
-    // Actualizar solo las zonas que cambiaron.
-    if (ascAnterior.x != actual.x ||
+
+      if (ascAnterior.x != actual.x ||
         ascAnterior.y != actual.y ||
         ascAnterior.visible != actual.visible) {
       int dx = abs(ascAnterior.x - actual.x);
