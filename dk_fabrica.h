@@ -96,7 +96,6 @@ void dkFabricaGolpe() {
     return;
   }
   --vidasMario;
-  dkSonidoImpacto();
   if (vidasMario <= 0) {
     vidasMario = 0;
     estadoActual = PANTALLA_GAME_OVER;
@@ -136,7 +135,7 @@ void dkFabricaPasoLogica() {
   int xJoy = analogRead(JOY_X);
   int yJoy = analogRead(JOY_Y);
   int movX = 0;
-  // Velocidad manual original: 2 pixeles por actualizacion.
+
   if (xJoy > 3000) {
     movX = -2;
   } else if (xJoy < 1000) {
@@ -184,8 +183,8 @@ void dkFabricaPasoLogica() {
       dkSaltoPendiente = false;
     } else {
       int arrastre = 0;
-      // La cinta transportadora arrastra a Mario
-      // solamente mientras esta apoyado en ella.
+      
+      
       if (fabEnSuelo) {
         fabDesplazamientoCinta +=
           FAB_VELOCIDAD_CINTA * fabSentidoCinta(fabNivel);
@@ -194,13 +193,13 @@ void dkFabricaPasoLogica() {
       } else {
         fabDesplazamientoCinta = 0.0f;
       }
-      // Movimiento manual y arrastre se suman.
+     
+      
       fabX = constrain(fabX + movX + arrastre, 10, 216);
       if (fabEnSuelo && dkSaltoPendiente) {
         fabVy = -5.0f;
         fabEnSuelo = false;
         fabDesplazamientoCinta = 0.0f;
-        dkSonidoSalto();
       }
       dkSaltoPendiente = false;
       if (!fabEnSuelo) {
@@ -217,8 +216,8 @@ void dkFabricaPasoLogica() {
       }
     }
   }
-  // Un obstaculo independiente por plataforma:
-  // primera, segunda y tercera.
+  
+  
   for (int i = 0; i < FAB_ENEMIGOS; ++i) {
     FabObstaculo &e = fabObstaculos[i];
     if (ahora - fabInicioJugable < FAB_ESPERA_INICIAL) continue;
@@ -249,8 +248,8 @@ void dkFabricaPasoLogica() {
       }
       break;
     }
-    // Sumar una sola vez si Mario esquivo el obstaculo
-    // en su propia plataforma, sin haber recibido el golpe.
+    
+    
     if (!e.puntuado && e.nivel == fabNivel && !fabSubiendo &&
         estadoActual == JUEGO_DONKEY_KONG) {
       float centroMario = fabX + FAB_MARIO_W / 2.0f;
@@ -263,7 +262,7 @@ void dkFabricaPasoLogica() {
       }
     }
   }
-  // Salida a la izquierda de la cuarta plataforma.
+  
   if (fabNivel == 3 &&
       fabEnSuelo &&
       !fabSubiendo &&
@@ -307,7 +306,7 @@ uint16_t fabColorFondo(int x, int y) {
       }
     }
   }
-  // EXIT en el extremo izquierdo superior.
+
   if (x >= 15 && x < 48 &&
       y >= 65 && y < 89) {
     return ILI9341_GREEN;
@@ -458,8 +457,8 @@ void dkFabricaDibujar() {
         );
       }
     }
-    // Redibujado localizado de obstaculos.
-    for (int i = 0; i < FAB_ENEMIGOS; ++i) {
+
+      for (int i = 0; i < FAB_ENEMIGOS; ++i) {
       bool antes = fabAnterior.enemigoActivo[i];
       bool despues = actual.enemigoActivo[i];
       if (!antes && !despues) {
@@ -513,8 +512,8 @@ void dkFabricaDibujar() {
     puntosAnteriores = actual.puntos;
   }
   fabAnterior = actual;
-  // La fisica y los enemigos se habilitan solo despues
-  // de finalizar el primer dibujo completo.
+
+  
   if (primerDibujo) {
     if (dkMutex == nullptr ||
         xSemaphoreTake(dkMutex, portMAX_DELAY) == pdTRUE) {
